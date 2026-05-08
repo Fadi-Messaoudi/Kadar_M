@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Jira Migration Audit"
+version = "1.0.0"
+id = "artifacts/jira-audit"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18958
+
+[services.development]
+run = "pnpm --filter @workspace/jira-audit run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/jira-audit", "run", "build" ]
+publicDir = "artifacts/jira-audit/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18958"
+BASE_PATH = "/"

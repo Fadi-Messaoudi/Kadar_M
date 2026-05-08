@@ -1,0 +1,401 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Jira DC/Server Migration Audit API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: audit
+    description: Jira migration audit operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /audit/connect:
+    post:
+      operationId: testJiraConnection
+      tags: [audit]
+      summary: Test Jira connection
+      description: Validate credentials and connectivity to a Jira DC/Server instance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JiraConnectionRequest"
+      responses:
+        "200":
+          description: Connection test result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JiraConnectionResult"
+
+  /audit/sessions:
+    get:
+      operationId: listAuditSessions
+      tags: [audit]
+      summary: List all audit sessions
+      description: Returns all past audit sessions
+      responses:
+        "200":
+          description: List of audit sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditSession"
+    post:
+      operationId: createAuditSession
+      tags: [audit]
+      summary: Start a new audit
+      description: Kick off a full migration audit against a Jira DC/Server instance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JiraConnectionRequest"
+      responses:
+        "201":
+          description: Audit session created and started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditSession"
+
+  /audit/sessions/stats:
+    get:
+      operationId: getAuditStats
+      tags: [audit]
+      summary: Aggregate audit statistics
+      description: High-level stats across all audit sessions
+      responses:
+        "200":
+          description: Aggregate stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditStats"
+
+  /audit/sessions/{id}:
+    get:
+      operationId: getAuditSession
+      tags: [audit]
+      summary: Get audit session with full results
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Full audit session details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditSessionDetail"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteAuditSession
+      tags: [audit]
+      summary: Delete an audit session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /audit/sessions/{id}/summary:
+    get:
+      operationId: getAuditSummary
+      tags: [audit]
+      summary: Get migration readiness summary
+      description: High-level readiness score and blocker/warning breakdown
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Readiness summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditSummary"
+        "404":
+          description: Not found
+
+  /audit/sessions/{id}/blockers:
+    get:
+      operationId: getAuditBlockers
+      tags: [audit]
+      summary: Get only blocker-level findings
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Blocker findings only
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditFinding"
+        "404":
+          description: Not found
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    JiraConnectionRequest:
+      type: object
+      properties:
+        jiraUrl:
+          type: string
+          description: Base URL of the Jira DC/Server instance (e.g. https://jira.mycompany.com)
+        username:
+          type: string
+          description: Jira admin username
+        password:
+          type: string
+          description: Jira admin password or personal access token
+        label:
+          type: string
+          description: Optional friendly label for this audit
+      required:
+        - jiraUrl
+        - username
+        - password
+
+    JiraConnectionResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        jiraVersion:
+          type: string
+        serverTitle:
+          type: string
+        deploymentType:
+          type: string
+          enum: [server, datacenter, cloud, unknown]
+        message:
+          type: string
+      required:
+        - success
+        - message
+
+    AuditSession:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        jiraUrl:
+          type: string
+        jiraVersion:
+          type: string
+        serverTitle:
+          type: string
+        deploymentType:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        readinessScore:
+          type: number
+          description: Migration readiness score 0-100
+        blockerCount:
+          type: integer
+        warningCount:
+          type: integer
+        infoCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+      required:
+        - id
+        - jiraUrl
+        - status
+        - createdAt
+
+    AuditFinding:
+      type: object
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        category:
+          type: string
+          enum:
+            [
+              system_info,
+              plugins,
+              custom_fields,
+              workflows,
+              permissions,
+              users,
+              data_volume,
+              automation,
+              projects,
+            ]
+        severity:
+          type: string
+          enum: [blocker, warning, info]
+        title:
+          type: string
+        description:
+          type: string
+        count:
+          type: integer
+          nullable: true
+        details:
+          type: string
+          nullable: true
+          description: JSON-encoded extra details
+        migrationNote:
+          type: string
+          nullable: true
+          description: Recommended action for migration
+      required:
+        - id
+        - sessionId
+        - category
+        - severity
+        - title
+        - description
+
+    AuditSessionDetail:
+      allOf:
+        - $ref: "#/components/schemas/AuditSession"
+        - type: object
+          properties:
+            findings:
+              type: array
+              items:
+                $ref: "#/components/schemas/AuditFinding"
+
+    AuditSummary:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        readinessScore:
+          type: number
+        readinessLevel:
+          type: string
+          enum: [critical, at_risk, moderate, good, excellent]
+        blockerCount:
+          type: integer
+        warningCount:
+          type: integer
+        infoCount:
+          type: integer
+        categoryBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryBreakdown"
+        topBlockers:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditFinding"
+      required:
+        - sessionId
+        - readinessScore
+        - readinessLevel
+        - blockerCount
+        - warningCount
+        - infoCount
+        - categoryBreakdown
+        - topBlockers
+
+    CategoryBreakdown:
+      type: object
+      properties:
+        category:
+          type: string
+        blockers:
+          type: integer
+        warnings:
+          type: integer
+        infos:
+          type: integer
+        score:
+          type: number
+          description: Category-level score 0-100
+      required:
+        - category
+        - blockers
+        - warnings
+        - infos
+        - score
+
+    AuditStats:
+      type: object
+      properties:
+        totalSessions:
+          type: integer
+        completedSessions:
+          type: integer
+        averageReadinessScore:
+          type: number
+        totalBlockersFound:
+          type: integer
+        totalWarningsFound:
+          type: integer
+        mostCommonBlockerCategory:
+          type: string
+          nullable: true
+      required:
+        - totalSessions
+        - completedSessions
+        - averageReadinessScore
+        - totalBlockersFound
+        - totalWarningsFound
