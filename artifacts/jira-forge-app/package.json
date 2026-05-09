@@ -1,0 +1,22 @@
+{
+  "name": "jira-migration-audit-forge",
+  "version": "1.0.0",
+  "description": "Jira DC/Server Migration Audit Tool — Atlassian Forge App",
+  "main": "src/index.js",
+  "scripts": {
+    "build": "cd static/hello-world && npm run build",
+    "deploy": "forge deploy",
+    "install": "forge install",
+    "tunnel": "forge tunnel"
+  },
+  "dependencies": {
+    "@forge/api": "^2.0.0",
+    "@forge/resolver": "^1.0.0"
+  },
+  "devDependencies": {
+    "@forge/cli": "^10.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
